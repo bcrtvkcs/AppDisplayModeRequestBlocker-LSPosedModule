@@ -20,11 +20,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # The runner image already ships the Android SDK; only accept the
+      # licenses and make sure the packages this project needs are present.
       - name: Install SDK packages
-        run: sdkmanager "platforms;android-36" "build-tools;34.0.0"
+        run: |
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;34.0.0"
 
       # The repository does not ship a Gradle wrapper jar, so install the
       # Gradle version pinned in gradle-wrapper.properties directly.
