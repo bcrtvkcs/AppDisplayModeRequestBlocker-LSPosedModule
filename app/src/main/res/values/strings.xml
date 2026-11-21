@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Display Mode Request Blocker</string>
+    <string name="module_description">Stops apps from forcing a specific display mode, so they cannot switch the screen to a lower resolution.</string>
+</resources>

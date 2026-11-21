@@ -1,0 +1,76 @@
+name: Build LSPosed module
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;34.0.0"
+
+      # The repository does not ship a Gradle wrapper jar, so install the
+      # Gradle version pinned in gradle-wrapper.properties directly.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.4
+
+      - name: Build release APK
+        run: gradle --no-daemon assembleRelease
+
+      - name: Stage APK
+        run: |
+          set -e
+          APK_PATH=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: no APK found after assembleRelease. Output tree:"
+            find app/build/outputs
+            exit 1
+          fi
+          echo "Found built APK at: $APK_PATH"
+          mkdir -p staging
+          cp "$APK_PATH" staging/AppDisplayModeRequestBlocker-LSPosedModule.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppDisplayModeRequestBlocker-LSPosedModule
+          path: staging/AppDisplayModeRequestBlocker-LSPosedModule.apk
+
+      # actions/upload-artifact downloads redirect through Azure Blob
+      # Storage, which isn't reachable from every environment, so also
+      # publish the APK the plain-git way: commit it into the repo.
+      # [skip ci] keeps this push from re-triggering the build and looping.
+      - name: Publish build output via git
+        run: |
+          set -e
+          mkdir -p dist
+          rm -f dist/*.apk
+          cp staging/AppDisplayModeRequestBlocker-LSPosedModule.apk dist/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist
+          if git diff --cached --quiet; then
+            echo "Nothing new to publish."
+          else
+            git commit -m "ci: publish build output for ${{ github.sha }} [skip ci]"
+            git push
+          fi
